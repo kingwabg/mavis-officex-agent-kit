@@ -1,0 +1,83 @@
+version: 1
+plan:
+  name: '[ox-dev-1] lib/child-documents.ts P2 분리 (worktree)'
+  max_concurrency: 1
+  max_consecutive_failures: 1
+  max_cycles: 1
+  auto_reject_retries: 0
+  verifier_config:
+    default_verifiers: []
+    audit_sample_rate: 0.0
+tasks:
+  - id: p2-refactor-child-documents
+    title: '[ox-dev-1] lib/child-documents.ts P2 분리 (worktree)'
+    role: verify-as-task
+    prompt: |
+      너는 officex-feature-builder (ox-dev-1 풀스택 슬롯) 다. 본인 agent.md + AGENTS.md §2 P2 read.
+
+      [작업 디렉토리]
+      - **반드시 `cd /tmp/wt/p2-childdocs` 한 줄이 첫 행동** (worktree 사용. main worktree 건들지 말 것)
+      - 이 워크트리만 작업하고 commit. 다른 worktree와 main은 손대지 말 것
+
+      [P2 리팩토링 — child-documents]
+      - 시작: `git -C /tmp/wt/p2-childdocs status --short` + `git rev-parse HEAD` 1줄 보고
+      - 기존 `lib/child-documents.ts` (203줄) → `lib/features/child-documents/` 모듈 분리:
+        - `lib/features/child-documents/types.ts`   (Type 정의: ChildDocumentCategory, TEXT_CATEGORIES, ChildDocument, 등 모든 type/export type)
+        - `lib/features/child-documents/data.ts`   (mock 데이터/시드 — 없으면 빈 stub)
+        - `lib/features/child-documents/store.ts`  (localStorage I/O: readLS/writeLS 패턴)
+        - `lib/features/child-documents/utils.ts`  (isTextCategory, 헬퍼 함수)
+        - `lib/features/child-documents/index.ts`  (public re-export: `export * from './types'; export * from './utils'; ...`)
+        - `lib/child-documents.ts` shim — `export * from './features/child-documents'` + `@deprecated` 주석 (옛 import 호환성 100%)
+      - 절차:
+        1. 옛 `lib/child-documents.ts` 의 모든 export (type + function) 목록화
+        2. 각 파일에 의미별로 분배 (type → types.ts, function → utils.ts, mock → data.ts, store → store.ts)
+        3. `index.ts` 에서 모든 public re-export
+        4. shim 작성 (`@deprecated` 주석 + `export *`)
+        5. 옛 import 경로 사용처 grep → 영향받는 파일 0건이면 (또는 모두 새 경로로 OK이면) OK
+
+      [검증]
+      - `cd /tmp/wt/p2-childdocs && npm run typecheck` 0 errors
+      - `git -C /tmp/wt/p2-childdocs diff --stat` — 새 파일 5개, 수정 1개 (shim), 삭제 0건
+      - 파일별 (전 → 후) 줄 수 비교표
+
+      [외부 동작 보존 — 최우선]
+      - 라우팅 변화 없음
+      - 데이터 시맨틱 변화 없음 (함수 시그니처 동일)
+      - 옛 `@/lib/child-documents` import 경로 그대로 동작 (shim 통해서)
+
+      [강제]
+      - 다른 파일 절대 손대지 말 것
+      - main worktree (`/tmp/sc-`) 와 다른 wt-p2-* 워크트리 절대 건들지 말 것
+      - 부수효과 금지 (별도 기능 추가 X)
+      - commit 하지 말 것 (owner가 따로 처리)
+
+      [Stop when 본인 agent.md 형식]
+      - 5개 신규 + 1개 shim
+      - typecheck 0 errors
+      - 옛 import 호환성 1줄 보고
+      - 파일별 줄 수 비교표
+      - parent 보고 done
+    assigned_to: 'officex-feature-builder'
+    verified_by: 'officex-reviewer'
+    verify_prompt: |
+      너는 officex-reviewer (ox-tester verifier-only) 다.
+
+      [검증 — P2 가속화 default + worktree 격리]
+      1. `cd /tmp/wt/p2-childdocs && npm run typecheck` → 첫 줄 (PASS/FAIL)
+      2. `git -C /tmp/wt/p2-childdocs diff --stat` → 5 files added (lib/features/child-documents/{types,data,store,utils,index}.ts) + 1 modified (lib/child-documents.ts shim) 확인
+      3. `git -C /tmp/sc- status --short` → 비어 있어야 함 (다른 worktree 작업이 main에 누출 X)
+      4. AGENTS.md §1·§2 + 7개 강제 규칙 점검
+      5. 옛 import 경로 (`@/lib/child-documents`) 검색 → 영향받는 파일이 새 경로 또는 shim 통과 동작 확인
+
+      [리포트 4섹션 (가속화)]
+      1. typecheck
+      2. 룰별 점검표 (PASS/FAIL)
+      3. FAIL 상세 / "없음"
+      4. 다음 행동 (통과 → ox-deploy / 차단 → dev fix-pointer)
+
+      [강제]
+      - 코드 수정 X (본인 agent.md Don't own)
+      - typecheck 한 번만
+      - 다른 worktree 작업 검증 X (이번 plan은 /tmp/wt/p2-childdocs 만)
+    max_retries: 1
+    timeout_ms: 300000

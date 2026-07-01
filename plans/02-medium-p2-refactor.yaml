@@ -1,0 +1,82 @@
+version: 1
+plan:
+  name: '[ox-dev-1] lib/settings.ts P2 분리 (worktree)'
+  max_concurrency: 1
+  max_consecutive_failures: 1
+  max_cycles: 2
+  auto_reject_retries: 0
+  verifier_config:
+    default_verifiers: []
+    audit_sample_rate: 0.0
+tasks:
+  - id: p2-refactor-settings
+    title: '[ox-dev-1] lib/settings.ts P2 분리 (worktree)'
+    role: verify-as-task
+    prompt: |
+      너는 officex-feature-builder (ox-dev-1 풀스택 슬롯) 다. 본인 agent.md + AGENTS.md §2 P2 read.
+
+      [작업 디렉토리]
+      - **반드시 `cd /tmp/wt/p2-settings` 한 줄이 첫 행동** (worktree 격리)
+      - main worktree (`/tmp/sc-/`) 와 다른 wt-p2-* 절대 건들지 말 것
+
+      [P2 리팩토링 — settings]
+      - 시작: `git -C /tmp/wt/p2-settings status --short` + `git rev-parse HEAD` 1줄 보고
+      - 기존 `lib/settings.ts` (200줄, §1 200줄 룰 정확히 위반) → `lib/features/settings/` 모듈 분리:
+        - `lib/features/settings/types.ts` — `SettingGroup`, `SettingItem`, `SettingSubItem` 타입 정의
+        - `lib/features/settings/data.ts` — `SETTING_GROUPS` 상수 배열 (193줄 내외)
+        - `lib/features/settings/utils.ts` — `getGroupById`, `getItemById` 헬퍼 함수
+        - `lib/features/settings/index.ts` — `export * from './types'; export * from './data'; export * from './utils';`
+        - `lib/settings.ts` shim — `export * from './features/settings'` + `@deprecated` 주석 (200줄 → ~7줄)
+      - 절차:
+        1. `lib/settings.ts` 전체 export 목록(type + const + function) 추출
+        2. 의미별 분배
+        3. `index.ts` 에서 public re-export
+        4. shim 작성 (200줄 → 7줄)
+        5. 옛 `@/lib/settings` import 사용처 grep → 영향 0건이면 OK (또는 모두 새 경로로 OK)
+
+      [검증]
+      - `cd /tmp/wt/p2-settings && npm run typecheck` 0 errors
+      - `git -C /tmp/wt/p2-settings diff --stat` — 4 files added + 1 modified (shim) + 0 deleted
+      - 파일별 (전 → 후) 줄 수 비교표
+
+      [AGENTS.md §1 룰 — 1줄 룰에 특히 주의]
+      - localStorage 키 = `ox:{domain}-{name}` (settings 사용 안 함 — 무관)
+      - 한국어 UI 100% (settings 라벨이 한국어야 — 1줄 보고)
+      - 외부 동작 보존 (페이지·사이드바 nav 100% 동일)
+
+      [강제]
+      - 200줄 룰 정확히 따라 분할 (이 파일이 사실상 §1 룰 위반 사례)
+      - 다른 파일 절대 손대지 말 것
+      - main / 다른 worktree 절대 건들지 말 것
+      - 부수효과 금지
+      - commit 하지 말 것 (owner가 처리)
+
+      [Stop when]
+      - 4 신규 + 1 shim
+      - typecheck 0
+      - 옛 import 호환성 1줄
+      - 파일별 줄 수 비교표
+      - parent 보고 done
+    assigned_to: 'officex-feature-builder'
+    verified_by: 'officex-reviewer'
+    verify_prompt: |
+      너는 officex-reviewer (ox-tester verifier-only) 다.
+
+      [검증]
+      1. `cd /tmp/wt/p2-settings && npm run typecheck` → 첫 줄
+      2. `git -C /tmp/wt/p2-settings diff --stat` — 4 files added (lib/features/settings/{types,data,utils,index}.ts) + 1 modified (lib/settings.ts shim)
+      3. `git -C /tmp/sc- status --short` → 비어 있어야 함 (worktree 격리 확인)
+      4. AGENTS.md §1 + 7개 강제 규칙 점검
+      5. 옛 `@/lib/settings` import 사용처 grep → 새 경로로 동작 확인
+
+      [리포트 4섹션 (가속화)]
+      1. typecheck
+      2. 룰별 점검표
+      3. FAIL 상세 / "없음"
+      4. 다음 행동
+
+      [강제]
+      - 코드 수정 X
+      - typecheck 한 번만
+    max_retries: 1
+    timeout_ms: 300000

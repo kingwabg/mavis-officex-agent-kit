@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mavis — Live Agent Trace</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Outfit:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #f7f5f0;
+      --surface: #ffffff;
+      --border: #e9e3d6;
+      --border-soft: #f0ebe0;
+      --text: #14171e;
+      --text-muted: #3a4256;
+      --text-dim: #7c7a72;
+      --accent: #2f6f5e;
+      --accent-soft: rgba(47,111,94,0.08);
+      --warn: #c97b3f;
+      --warn-soft: rgba(201,123,63,0.06);
+      --fail: #b06367;
+      --fail-soft: rgba(176,99,103,0.10);
+      --ok: #4a7d4f;
+    }
+    body { background: var(--bg); color: var(--text); font-family: 'Outfit', sans-serif; margin: 0; padding: 0; line-height: 1.55; font-size: 14px; }
+    .page { max-width: 64rem; margin: 0 auto; padding: 48px 24px 80px; }
+    h1 { font-family: 'DM Serif Display', serif; font-weight: 400; font-size: 32px; margin: 0 0 6px; letter-spacing: -0.01em; }
+    h1 .sub { font-family: 'Outfit', sans-serif; font-weight: 500; font-size: 12px; color: var(--text-dim); letter-spacing: 0.05em; text-transform: uppercase; display: block; margin-bottom: 6px; }
+    h2 { font-family: 'DM Serif Display', serif; font-weight: 400; font-size: 20px; margin: 48px 0 14px; display: flex; align-items: baseline; gap: 10px; }
+    h2 .num { font-family: 'Outfit', sans-serif; font-weight: 500; font-size: 12px; color: var(--text-dim); letter-spacing: 0.05em; }
+    .meta-bar { display: flex; gap: 24px; align-items: baseline; padding: 12px 0 32px; border-bottom: 1px dashed var(--border); margin-bottom: 8px; font-size: 13px; color: var(--text-dim); flex-wrap: wrap; }
+    .meta-bar .ts { font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 24px; }
+    .stat { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; }
+    .stat .label { font-size: 11px; color: var(--text-dim); letter-spacing: 0.05em; text-transform: uppercase; font-weight: 500; }
+    .stat .value { font-family: 'DM Serif Display', serif; font-weight: 400; font-size: 28px; margin: 4px 0 0; color: var(--text); }
+    .stat .delta { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--accent); }
+
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { padding: 10px 12px; text-align: left; border-bottom: 1px dashed var(--border); vertical-align: top; }
+    th { font-weight: 600; color: var(--text-muted); font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; }
+    td .session-id { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-dim); }
+    td .title { font-weight: 500; color: var(--text); }
+
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 500; font-family: 'JetBrains Mono', monospace; }
+    .badge.officex-feature-builder, .badge.officex-data-layer, .badge.officex-integration,
+    .badge.officex-architect, .badge.officex-deployer, .badge.officex-reviewer { background: var(--accent-soft); color: var(--accent); }
+    .badge.officex-feature-builder { background: rgba(47,111,94,0.16); }
+    .badge.status-finished, .badge.status-done, .badge.status-completed { background: rgba(74,125,79,0.10); color: var(--ok); }
+    .badge.status-running, .badge.status-producing, .badge.status-started { background: var(--warn-soft); color: var(--warn); }
+    .badge.status-error, .badge.status-failed { background: var(--fail-soft); color: var(--fail); }
+    .badge.status-paused, .badge.status-evaluating { background: rgba(60,80,200,0.10); color: #3a50c8; }
+    .badge.ox-dev-1, .badge.ox-dev-2, .badge.ox-dev-3, .badge.ox-feat, .badge.ox-data, .badge.ox-intg, .badge.ox-refac, .badge.ox-ui, .badge.ox-arch, .badge.ox-tester, .badge.ox-reviewer, .badge.ox-deploy { background: var(--accent-soft); color: var(--accent); }
+
+    .duration { font-family: 'JetBrains Mono', monospace; color: var(--text-muted); font-size: 12px; }
+    .row-dep { opacity: 0.5; text-decoration: line-through; }
+    code, .mono { font-family: 'JetBrains Mono', monospace; font-size: 12px; background: var(--accent-soft); padding: 1px 6px; border-radius: 4px; color: var(--accent); }
+
+    .details { margin-top: 24px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 20px; max-height: 480px; overflow-y: auto; }
+    .details .head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; }
+    .details pre { font-family: 'JetBrains Mono', monospace; font-size: 12px; white-space: pre-wrap; word-break: break-word; background: #fbfaf7; border: 1px solid var(--border-soft); border-radius: 8px; padding: 14px; line-height: 1.55; margin: 0 0 10px; max-height: 240px; overflow-y: auto; }
+    .details .empty { color: var(--text-dim); font-size: 13px; text-align: center; padding: 32px 0; }
+    details summary { cursor: pointer; font-weight: 500; color: var(--accent); padding: 6px 0; }
+    details[open] summary { margin-bottom: 8px; }
+
+    /* Plan tree */
+    .plan-block {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px 20px;
+      margin-bottom: 14px;
+    }
+    .plan-block .plan-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 12px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+    .plan-block .plan-name { font-weight: 600; font-size: 14px; }
+    .plan-block .plan-meta { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-dim); }
+    .task {
+      border-left: 2px solid var(--border-soft);
+      margin-left: 6px;
+      padding: 6px 0 6px 14px;
+    }
+    .task-head {
+      display: flex;
+      gap: 10px;
+      align-items: baseline;
+      flex-wrap: wrap;
+      font-size: 13px;
+    }
+    .task-head .task-id { font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 500; }
+    .verifier-line {
+      margin-top: 6px;
+      padding: 6px 12px;
+      background: #fbfaf7;
+      border-radius: 6px;
+      font-size: 12px;
+    }
+    .verifier-line.pass { border-left: 2px solid var(--ok); }
+    .verifier-line.fail { border-left: 2px solid var(--fail); }
+    .verifier-line.summary { color: var(--text-muted); font-family: 'JetBrains Mono', monospace; font-size: 11px; white-space: pre-wrap; max-height: 240px; overflow-y: auto; line-height: 1.5; }
+    .verdict-summary { color: var(--text-muted); font-size: 12px; margin-top: 4px; }
+    .verdict-summary.ok { color: var(--ok); }
+    .verdict-summary.bad { color: var(--fail); }
+
+    footer { margin-top: 56px; padding-top: 24px; border-top: 1px dashed var(--border); font-size: 11px; color: var(--text-dim); text-align: center; }
+    .err { padding: 12px; background: var(--fail-soft); border-radius: 8px; color: var(--fail); font-size: 13px; }
+
+    .refresh-btn {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 6px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 12px;
+      color: var(--text);
+    }
+    .refresh-btn:hover { border-color: var(--accent); color: var(--accent); }
+  </style>
+</head>
+<body>
+<div class="page">
+  <h1><span class="sub">live trace · 2026-07-01</span>Mavis — Agent Activity</h1>
+
+  <div class="meta-bar">
+    <span>Generated <span class="ts" id="ts">—</span></span>
+    <span>Refresh: <code>mavis-team-trace-dump.sh</code></span>
+    <button class="refresh-btn" onclick="loadTrace(true)">re-fetch</button>
+  </div>
+
+  <div id="stats" class="stats"></div>
+
+  <h2><span class="num">01</span>Sessions (recent 50)</h2>
+  <table id="sessions">
+    <thead>
+      <tr>
+        <th>Agent</th>
+        <th>Title</th>
+        <th>Status</th>
+        <th>Duration</th>
+        <th>Started</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <h2><span class="num">02</span>Plans (verdict tree)</h2>
+  <div id="plans"></div>
+
+  <h2><span class="num">03</span>Per-agent counts</h2>
+  <table id="agents">
+    <thead>
+      <tr><th>Agent</th><th>Total</th><th>Finished</th><th>Compressed</th></tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <div id="details-wrap"></div>
+
+  <footer>
+    mavis-trace.html · companion: <code>mavis-team-trace-dump.sh</code>
+  </footer>
+</div>
+
+<script>
+const DEPRECATED = new Set(['officex-refactorer', 'officex-frontend']);
+const STATUS_CLASS = {
+  finished: 'status-finished',
+  done: 'status-done',
+  completed: 'status-completed',
+  running: 'status-running',
+  producing: 'status-producing',
+  started: 'status-running',
+  error: 'status-error',
+  failed: 'status-failed',
+  aborted: 'status-error',
+  interrupted: 'status-error',
+  paused: 'status-paused',
+  evaluating: 'status-evaluating',
+};
+const SHORT = {
+  'officex-feature-builder': 'ox-dev-1',
+  'officex-data-layer': 'ox-dev-2',
+  'officex-integration': 'ox-dev-3',
+  'officex-refactorer': '~~ox-refac~~',
+  'officex-frontend': '~~ox-ui~~',
+  'officex-architect': 'ox-arch',
+  'officex-deployer': 'ox-deploy',
+  'officex-reviewer': 'ox-tester',
+  'mavis': 'Mavis',
+};
+
+function fmtDuration(s) {
+  if (s == null || isNaN(s) || s === 0) return '—';
+  if (s < 60) return `${s.toFixed(1)}s`;
+  if (s < 3600) return `${Math.floor(s/60)}m ${Math.round(s%60)}s`;
+  return `${Math.floor(s/3600)}h ${Math.floor((s%3600)/60)}m`;
+}
+function fmtTs(ms) {
+  if (!ms) return '—';
+  const d = new Date(ms);
+  return d.toLocaleString('ko-KR', { hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false, year:'numeric', month:'2-digit', day:'2-digit' });
+}
+function fmtTsShort(ms) {
+  if (!ms) return '—';
+  const d = new Date(ms);
+  const today = new Date();
+  const sameDay = d.toDateString() === today.toDateString();
+  return sameDay ? d.toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',hour12:false}) : d.toLocaleDateString('ko-KR',{month:'2-digit',day:'2-digit'}) + ' ' + d.toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',hour12:false});
+}
+function escapeHtml(s) {
+  return (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+async function loadTrace(force=false) {
+  const url = './mavis-trace.json?t=' + (force ? Date.now() : '');
+  const errEl = document.getElementById('details-wrap');
+  try {
+    const r = await fetch(url);
+    if (!r.ok) throw new Error('fetch ' + r.status);
+    const data = await r.json();
+    errEl.innerHTML = '';
+    render(data);
+  } catch (e) {
+    document.getElementById('stats').innerHTML = '';
+    document.querySelector('#sessions tbody').innerHTML = '';
+    document.getElementById('plans').innerHTML = '';
+    errEl.innerHTML = `<div class="err">mavis-trace.json not loaded: ${e.message}. Run <code>mavis-team-trace-dump.sh</code> in workspace dir first.</div>`;
+  }
+}
+
+function render(data) {
+  document.getElementById('ts').textContent = data.generated_at || new Date().toISOString();
+
+  // stats
+  const stats = document.getElementById('stats');
+  const total = data.sessions_total || 0;
+  const last24 = data.sessions_last_24h || 0;
+  const finished = (data.sessions || []).filter(s => s.status === 'finished').length;
+  const plansTotal = data.plans_total || 0;
+  const plansCompleted = data.plans_completed || 0;
+  const plansRunning = data.plans_running || 0;
+  stats.innerHTML = `
+    <div class="stat"><div class="label">Sessions</div><div class="value">${total}</div><div class="delta">${last24} in last 24h</div></div>
+    <div class="stat"><div class="label">Finished</div><div class="value">${finished}</div><div class="delta">${total ? Math.round(finished*100/total) : 0}%</div></div>
+    <div class="stat"><div class="label">Plans</div><div class="value">${plansTotal}</div><div class="delta">${plansCompleted} done · ${plansRunning} running</div></div>
+    <div class="stat"><div class="label">Active agents</div><div class="value">${Object.keys(data.agent_counts||{}).length}</div><div class="delta">across session pool</div></div>
+  `;
+
+  // sessions table
+  const tbody = document.querySelector('#sessions tbody');
+  const sessions = (data.sessions || []).slice().sort((a,b) => b.updated_at - a.updated_at).slice(0, 50);
+  if (!sessions.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-dim)">No sessions captured.</td></tr>';
+  } else {
+    tbody.innerHTML = sessions.map((s) => {
+      const agentShort = SHORT[s.agent_name] || s.agent_name;
+      const dep = DEPRECATED.has(s.agent_name);
+      const sc = STATUS_CLASS[s.status] || '';
+      return `<tr class="${dep ? 'row-dep' : ''}" data-sid="${s.id}">
+        <td><span class="badge ${s.agent_name.replace(/[^a-z0-9-]/gi,'-')}">${agentShort}</span></td>
+        <td><span class="title">${escapeHtml(s.title || '(no title)')}</span><div class="session-id">${s.id.slice(0,16)}…</div></td>
+        <td><span class="badge ${sc}">${s.status}</span>${s.compressed ? ' <span class="badge" style="background:var(--border-soft);color:var(--text-dim)">arch</span>' : ''}</td>
+        <td class="duration">${fmtDuration(s.duration_sec)}</td>
+        <td class="duration">${fmtTsShort(s.created_at)}</td>
+        <td><button onclick="loadSession('${s.id}')" class="mono" style="cursor:pointer;border:1px solid var(--border-soft);background:#fff;padding:4px 10px;border-radius:6px">view</button></td>
+      </tr>`;
+    }).join('');
+  }
+
+  // plans tree
+  const plansEl = document.getElementById('plans');
+  const plans = data.plans || [];
+  if (!plans.length) {
+    plansEl.innerHTML = '<div style="text-align:center;color:var(--text-dim);font-size:13px;padding:24px">No plans captured.</div>';
+  } else {
+    plansEl.innerHTML = plans.map(p => {
+      const tasks = (p.results || []).map(r => {
+        const verdicts = (r.verifier_results || []).map(v => {
+          const cl = v.passed ? 'pass' : 'fail';
+          const head = `<div class="verifier-line ${cl}">
+            <strong>${escapeHtml(v.agent || '?')}</strong> ·
+            <span class="duration">session <code>${(v.session_id||'?').slice(0,16)}…</code></span> ·
+            ${v.passed ? '<span class="badge status-finished">PASS</span>' : '<span class="badge status-error">FAIL</span>'}
+            ${v.inconclusive ? ' <span class="badge status-paused">inconclusive</span>' : ''}
+            ${v.summary ? `<div class="summary">${escapeHtml(v.summary)}</div>` : ''}
+          </div>`;
+          return head;
+        }).join('') || '<div class="verifier-line"><em style="color:var(--text-dim)">no verifier</em></div>';
+
+        const okColor = (r.verdict_summary || '').includes('accept') ? 'ok'
+          : (r.verdict_summary || '').match(/fail|FAIL/i) ? 'bad' : '';
+        return `<div class="task">
+          <div class="task-head">
+            <span class="task-id">${escapeHtml(r.task_id || '?')}</span>
+            <span class="badge status-${escapeHtml(r.status || '?')}">${escapeHtml(r.status || '?')}</span>
+            ${r.producer_agent ? `<span class="duration">producer: <strong>${escapeHtml(r.producer_agent)}</strong></span>` : ''}
+            ${r.duration_sec ? `<span class="duration">~${fmtDuration(r.duration_sec)}</span>` : ''}
+          </div>
+          ${r.verdict_summary ? `<div class="verdict-summary ${okColor}">verdict: ${escapeHtml(r.verdict_summary)}</div>` : ''}
+          ${verdicts}
+        </div>`;
+      }).join('') || '<div style="color:var(--text-dim);font-size:13px">no tasks in plan</div>';
+
+      return `<div class="plan-block">
+        <div class="plan-head">
+          <div>
+            <div class="plan-name">${escapeHtml(p.name || p.plan_id)}</div>
+            <div class="plan-meta">${escapeHtml(p.plan_id)} · cycle ${p.cycle || 0} · ${escapeHtml(p.phase || '')}</div>
+          </div>
+          <span class="badge status-${escapeHtml(p.status || '?')}">${escapeHtml(p.status || '?')}</span>
+        </div>
+        ${tasks}
+      </div>`;
+    }).join('');
+  }
+
+  // agent counts
+  const agentTbody = document.querySelector('#agents tbody');
+  const ac = data.agent_counts || {};
+  const acEntries = Object.entries(ac).sort((a,b)=>b[1].total-a[1].total);
+  if (!acEntries.length) {
+    agentTbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text-dim)">No agents.</td></tr>';
+  } else {
+    agentTbody.innerHTML = acEntries.map(([name, c]) => {
+      const display = SHORT[name] || name;
+      const dep = DEPRECATED.has(name);
+      return `<tr class="${dep ? 'row-dep' : ''}">
+        <td><span class="badge ${name.replace(/[^a-z0-9-]/gi,'-')}">${display}</span></td>
+        <td><strong>${c.total}</strong></td>
+        <td>${c.finished || c.completed || 0}</td>
+        <td>${c.compressed}</td>
+      </tr>`;
+    }).join('');
+  }
+}
+
+async function loadSession(sid) {
+  const wrap = document.getElementById('details-wrap');
+  wrap.innerHTML = `<div class="details"><div class="head"><strong>Session ${sid}</strong><span class="mono">loading…</span></div><div class="empty">Fetching…</div></div>`;
+  try {
+    const r = await fetch(`mavis-sessions/${sid}.json?t=${Date.now()}`);
+    if (r.ok) {
+      const data = await r.json();
+      renderDetails(sid, data);
+      return;
+    }
+  } catch (e) { /* fallthrough */ }
+  // Fallback
+  wrap.innerHTML = `<div class="details">
+    <div class="head"><strong>Session ${sid}</strong><code>${sid.slice(0,20)}…</code></div>
+    <p style="color:var(--text-muted);font-size:13px">Pre-cache missing. Run dump then re-click.</p>
+    <pre style="display:block">./mavis-team-trace-dump.sh
+# then refresh this page</pre>
+  </div>`;
+}
+
+function renderDetails(sid, data) {
+  const wrap = document.getElementById('details-wrap');
+  const msgs = (data.messages || []).map(m => {
+    const role = m.role || '?';
+    const ts = fmtTsShort(m.ts);
+    const content = (m.content || '').slice(0, 1200);
+    return `<details><summary>${escapeHtml(role)} · ${escapeHtml(ts)}</summary><pre>${escapeHtml(content)}</pre></details>`;
+  }).join('');
+  wrap.innerHTML = `<div class="details">
+    <div class="head">
+      <strong>Session ${escapeHtml(sid.slice(0,20))}…</strong>
+      <div><span class="mono">${data.message_count || 0} msgs</span> · ${escapeHtml(data.title || '')}</div>
+    </div>
+    ${msgs || '<div class="empty">No messages.</div>'}
+  </div>`;
+}
+
+loadTrace();
+setTimeout(() => loadTrace(), 30000); // soft auto-refresh every 30s
+</script>
+</body>
+</html>
