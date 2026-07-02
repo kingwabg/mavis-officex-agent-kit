@@ -1,6 +1,6 @@
 # Mavis Agent Kit — Officex Care Edition
 
-9 officex-* role-specific agents + 운영 메모 + 시각화 도구를 한 줄 설치로 셋업합니다.
+8 officex-* role-specific agents + 운영 메모 + 시각화 도구를 한 줄 설치로 셋업합니다.
 Mavis (MiniMax Code) 환경이 이미 깔려 있는 다른 컴퓨터에서 `git clone + ./install.sh` 만으로 동일 워크플로우를 재현할 수 있게 모듈화.
 
 ## 구성
@@ -11,7 +11,7 @@ mavis-officex-agent-kit/
 ├── LICENSE                        ← MIT
 ├── install.sh                     ← one-command setup
 │
-├── agents/                        ← 9개 officex-* agent 정의 (.md + .yaml 쌍)
+├── agents/                        ← 8개 officex-* agent 정의 (.md + .yaml 쌍)
 │   ├── officex-architect.{md,yaml}            # arch (default 0.1초 auto-pass)
 │   ├── officex-feature-builder.{md,yaml}      # 풀스택 슬롯 1 (ox-dev-1)
 │   ├── officex-data-layer.{md,yaml}           # 풀스택 슬롯 2 (ox-dev-2)
