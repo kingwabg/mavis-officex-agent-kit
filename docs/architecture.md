@@ -1,5 +1,20 @@
 # Architecture
 
+## 9-Agent Roster
+
+| agent | role | 비고 |
+|---|---|---|
+| officex-architect | arch validator | default 0.1s auto-pass (큰 변경만 detail) |
+| officex-feature-builder | 풀스택 슬롯 1 (ox-dev-1) | 신규 도메인 / UI 통합 |
+| officex-data-layer | 풀스택 슬롯 2 (ox-dev-2) | Prisma / schema / seed |
+| officex-integration | 풀스택 슬롯 3 (ox-dev-3) | OAuth / 외부 API / webhook |
+| officex-frontend | UI specialist | 셸 어댑터 / 디자인 토큰 / a11y |
+| officex-refactorer | 리팩토링 | 200줄 분할 / 셸 적용 / lib root → features |
+| officex-reviewer | tester (verifier-only) | AGENTS.md 7규칙 + typecheck |
+| officex-deployer | 빌드/preview | typecheck + dev boot + smoke |
+
+dev 슬롯 3개는 **풀스택 동일 역할** — 어떤 task 든 받음. Mavis 가 idle 슬롯에 자동 라우팅.
+
 ## 5-Role Workflow (full mode, default)
 
 ```
